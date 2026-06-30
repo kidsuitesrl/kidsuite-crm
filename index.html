@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kidsuite CRM — Dashboard 2026-2027</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#F0F4F8;color:#1A2B3C}
+header{background:linear-gradient(135deg,#1A2B3C,#2E5A8E);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+header h1{font-size:1.4rem;font-weight:700}
+header span{font-size:.82rem;opacity:.75}
+
+/* ── KPI STRIP ── */
+.kpi-bar{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;padding:14px 24px 8px}
+.kpi{background:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 1px 5px rgba(0,0,0,.08);border-top:4px solid var(--c)}
+.kpi .val{font-size:1.22rem;font-weight:700;color:var(--c)}
+.kpi .lbl{font-size:.72rem;color:#666;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── AGENTE STRIP ── */
+.agente-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:0 24px 12px}
+.ag-card{background:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 1px 5px rgba(0,0,0,.08);border-left:4px solid var(--c);position:relative}
+.ag-name{font-size:.78rem;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.ag-val{font-size:1.12rem;font-weight:700;color:#1A2B3C}
+.ag-sub{font-size:.7rem;color:#888;margin-top:3px}
+.ag-bgt{font-size:.7rem;color:var(--c);margin-top:2px;font-weight:600}
+.progress-wrap{margin-top:6px;background:#EEF2F7;border-radius:4px;height:6px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;background:var(--c);transition:width .4s ease}
+
+/* ── BUDGET DELTA BADGE ── */
+.delta-pos{color:#2E7D32;font-weight:700}
+.delta-neg{color:#C62828;font-weight:700}
+.delta-neu{color:#888;font-style:italic}
+
+/* ── LAYOUT ── */
+.main{display:grid;grid-template-columns:1fr 400px;gap:12px;padding:0 24px 14px}
+#map{height:460px;border-radius:10px;box-shadow:0 1px 8px rgba(0,0,0,.12)}
+.side-panel{display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.card h3{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#2E5A8E;margin-bottom:8px}
+.charts-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0 24px 14px}
+.chart-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.chart-card h3{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#2E5A8E;margin-bottom:6px}
+
+/* ── CLIENT LIST ── */
+.client-list{max-height:210px;overflow-y:auto}
+.client-row{display:grid;grid-template-columns:1fr auto;padding:5px 3px;border-bottom:1px solid #F0F4F8;font-size:.79rem;cursor:pointer;transition:background .12s}
+.client-row:hover{background:#EBF4FF}
+.client-name{font-weight:600}
+.client-sub{color:#888;font-size:.71rem}
+.client-val{font-weight:700;color:#1565C0;text-align:right;font-size:.81rem}
+
+/* ── FILTER BARS ── */
+.filter-bar{padding:0 24px 8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:4px 11px;border:1.5px solid #2E5A8E;background:#fff;color:#2E5A8E;border-radius:20px;cursor:pointer;font-size:.77rem;font-weight:600;transition:all .12s}
+.filter-btn.active,.filter-btn:hover{background:#2E5A8E;color:#fff}
+.season-bar{padding:2px 24px 12px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.season-bar label{font-size:.77rem;font-weight:700;color:#555;margin-right:4px}
+.stab{padding:4px 14px;border:1.5px solid #E65100;background:#fff;color:#E65100;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:700;transition:all .12s}
+.stab.active,.stab:hover{background:#E65100;color:#fff}
+.stab-sm{padding:3px 9px;border:1.5px solid #E65100;background:#fff;color:#E65100;border-radius:20px;cursor:pointer;font-size:.7rem;font-weight:700;transition:all .12s}
+.stab-sm.active,.stab-sm:hover{background:#E65100;color:#fff}
+#search{padding:6px 13px;border:1.5px solid rgba(255,255,255,.4);border-radius:20px;font-size:.83rem;width:200px;outline:none;background:rgba(255,255,255,.15);color:#fff}
+#search::placeholder{color:rgba(255,255,255,.6)}
+#search:focus{border-color:#fff;background:rgba(255,255,255,.25)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#f1f1f1}::-webkit-scrollbar-thumb{background:#aaa;border-radius:3px}
+.leaflet-popup-content{margin:8px 12px;min-width:200px}
+.badge{background:#E65100;color:#fff;border-radius:4px;padding:1px 5px;font-size:.65rem;font-weight:700;vertical-align:middle;margin-left:3px}
+.badge-g{background:#2E7D32;color:#fff;border-radius:4px;padding:1px 5px;font-size:.65rem;font-weight:700;vertical-align:middle;margin-left:3px}
+
+/* ── AGENT TABLE ── */
+.table-section{padding:0 24px 18px}
+.table-section h2{font-size:.95rem;font-weight:700;color:#1A2B3C;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #2E5A8E;display:flex;align-items:center;gap:8px}
+.agent-table{width:100%;border-collapse:collapse;font-size:.81rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.agent-table th{background:#2E5A8E;color:#fff;padding:9px 12px;text-align:right;font-size:.74rem;letter-spacing:.03em;white-space:nowrap}
+.agent-table th:first-child,.agent-table th:nth-child(2){text-align:left}
+.agent-table td{padding:7px 12px;border-bottom:1px solid #EEF2F7;text-align:right;white-space:nowrap}
+.agent-table td:first-child,.agent-table td:nth-child(2){text-align:left}
+.ag-header td{background:#EBF4FF;font-weight:700;color:#1565C0;font-size:.84rem;border-top:2px solid #2E5A8E}
+.brand-row td:nth-child(2){padding-left:26px;color:#444;font-size:.79rem}
+.tot-row td{background:#F5F5F5;font-weight:700;border-top:1px solid #ccc;font-size:.82rem}
+.grand-tot td{background:#1A2B3C;color:#fff;font-weight:700;font-size:.84rem}
+.vp{color:#1565C0;font-weight:600}
+.vz{color:#bbb;font-style:italic}
+.e27cell{color:#E65100;font-weight:700}
+
+/* ── YoY TABLE ── */
+.yoy-section{padding:0 24px 18px}
+.yoy-table{width:100%;border-collapse:collapse;font-size:.81rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.yoy-table th{background:#1A2B3C;color:#fff;padding:8px 12px;text-align:right;font-size:.74rem;white-space:nowrap}
+.yoy-table th:first-child{text-align:left}
+.yoy-table td{padding:6px 12px;border-bottom:1px solid #EEF2F7;text-align:right;white-space:nowrap}
+.yoy-table td:first-child{text-align:left;font-weight:600}
+.yoy-table tr:nth-child(even) td{background:#F7FAFF}
+.yoy-table .grand td{background:#1A2B3C;color:#fff;font-weight:700}
+.pos{color:#2E7D32;font-weight:700}
+.neg{color:#C62828;font-weight:700}
+.neu{color:#bbb;font-style:italic}
+
+/* ── HEATMAP ── */
+.heatmap-section{padding:0 24px 28px}
+.heatmap-table{width:100%;border-collapse:collapse;font-size:.79rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.heatmap-table th{background:#E65100;color:#fff;padding:8px 10px;text-align:center;font-size:.74rem;white-space:nowrap}
+.heatmap-table th:first-child{text-align:left}
+.heatmap-table th:nth-child(2){text-align:left}
+.heatmap-table td{padding:5px 8px;border-bottom:1px solid #EEF2F7;text-align:center;white-space:nowrap;transition:background .1s}
+.heatmap-table td:first-child{text-align:left;font-weight:600;font-size:.78rem}
+.heatmap-table td:last-child{font-weight:700;color:#1A2B3C;background:#F0F4F8!important}
+.heatmap-table tr:hover td{filter:brightness(.96)}
+.hm-zero{color:#E0E0E0;font-size:.72rem}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&#x1F9D2; Kidsuite CRM &mdash; Dashboard Vendite 2026-2027</h1>
+    <span>Stagioni E-2026 &bull; I-2026 &bull; E-2027 &mdash; Fonte: Notion Ordini &bull; Verifica: 30/06/2026</span>
+  </div>
+  <input id="search" type="text" placeholder="&#x1F50D; Cerca cliente&hellip;" oninput="filterSearch(this.value)">
+</header>
+
+<!-- ── KPI STRIP ── -->
+<div class="kpi-bar">
+  <div class="kpi" style="--c:#1565C0"><div class="val">&euro; 1.087.692</div><div class="lbl">Fatturato Totale 2026</div></div>
+  <div class="kpi" style="--c:#2E7D32"><div class="val">77</div><div class="lbl">Clienti Attivi</div></div>
+  <div class="kpi" style="--c:#1976D2"><div class="val">&euro; 526.001</div><div class="lbl">Estate 2026</div></div>
+  <div class="kpi" style="--c:#6A1B9A"><div class="val">&euro; 561.691</div><div class="lbl">Inverno 2026</div></div>
+  <div class="kpi" style="--c:#E65100"><div class="val" id="kpi-e2027">— in raccolta</div><div class="lbl">Estate 2027 <span class="badge">NUOVO</span></div></div>
+  <div class="kpi" style="--c:#00838F"><div class="val">&euro; 14.126</div><div class="lbl">Media / Cliente</div></div>
+  <div class="kpi" style="--c:#AD1457"><div class="val">&euro; 645.960</div><div class="lbl">Budget E-2027 <span class="badge-g">TARGET</span></div></div>
+</div>
+
+<!-- ── AGENTE STRIP ── -->
+<div class="agente-strip">
+  <div class="ag-card" style="--c:#1565C0">
+    <div class="ag-name">&#x1F535; Filippo Bruschi</div>
+    <div class="ag-val">&euro; 854.645</div>
+    <div class="ag-sub">E&#8209;2026: €414.595 &nbsp;|&nbsp; I&#8209;2026: €440.050</div>
+    <div class="ag-bgt">Budget E&#8209;2027: &euro; 465.518</div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="ag-card" style="--c:#2E7D32">
+    <div class="ag-name">&#x1F7E2; Roberto Bruschi</div>
+    <div class="ag-val">&euro; 111.365</div>
+    <div class="ag-sub">E&#8209;2026: €51.910 &nbsp;|&nbsp; I&#8209;2026: €59.455</div>
+    <div class="ag-bgt">Budget E&#8209;2027: &euro; 76.204</div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="ag-card" style="--c:#E65100">
+    <div class="ag-name">&#x1F7E0; Alessandro Cogliani</div>
+    <div class="ag-val">&euro; 189.858</div>
+    <div class="ag-sub">E&#8209;2026: €91.787 &nbsp;|&nbsp; I&#8209;2026: €98.071</div>
+    <div class="ag-bgt">Budget E&#8209;2027: &euro; 104.238</div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="ag-card" style="--c:#00838F">
+    <div class="ag-name">&#x1F4CA; E-2027 vs Budget Totale</div>
+    <div class="ag-val">&euro; 0 <span style="color:#aaa;font-size:.8rem;font-weight:400">/ &euro; 645.960</span></div>
+    <div class="ag-sub">Raccolta: 0% — in corso</div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="ag-card" style="--c:#AD1457">
+    <div class="ag-name">&#x25B3; &Delta; E-2027 / Budget</div>
+    <div class="ag-val" style="color:#aaa;font-style:italic">Da aggiornare</div>
+    <div class="ag-sub">Differenza &euro; da budget appena disponibile</div>
+    <div class="ag-bgt">Media brand/cliente: <b>2,3</b></div>
+  </div>
+</div>
+
+<!-- ── FILTER BAR ── -->
+<div class="filter-bar">
+  <span style="font-size:.77rem;font-weight:700;color:#555">BRAND:</span>
+  <button class="filter-btn active" onclick="filterBrand('ALL',this)">Tutti</button>
+  <button class="filter-btn" onclick="filterBrand('Melby',this)">Melby</button>
+  <button class="filter-btn" onclick="filterBrand('MLB',this)">MLB</button>
+  <button class="filter-btn" onclick="filterBrand('Boboli',this)">Boboli</button>
+  <button class="filter-btn" onclick="filterBrand('Tuc Tuc',this)">Tuc Tuc</button>
+  <button class="filter-btn" onclick="filterBrand('Nath',this)">Nath</button>
+  <button class="filter-btn" onclick="filterBrand('Losan',this)">Losan</button>
+  <button class="filter-btn" onclick="filterBrand('LSN',this)">LSN</button>
+  <button class="filter-btn" onclick="filterBrand('Street Monkey',this)">Street Monkey</button>
+</div>
+
+<!-- ── MAP + SIDE PANEL ── -->
+<div class="main">
+  <div id="map"></div>
+  <div class="side-panel">
+    <div class="card">
+      <h3>Top Clienti per Fatturato</h3>
+      <div class="client-list" id="client-list"></div>
+    </div>
+    <div class="card">
+      <h3>Distribuzione per Zona &mdash; <span id="zona-lbl">Totale 2026</span></h3>
+      <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="stab-sm active" onclick="switchZona('total',this)">Totale</button>
+        <button class="stab-sm" onclick="switchZona('e2026',this)">E-2026</button>
+        <button class="stab-sm" onclick="switchZona('i2026',this)">I-2026</button>
+        <button class="stab-sm" onclick="switchZona('e2027',this)">E-2027</button>
+      </div>
+      <canvas id="zonaChart" height="175"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ── SEASON BAR ── -->
+<div class="season-bar">
+  <label>GRAFICO AGENTE:</label>
+  <button class="stab active" onclick="switchAgente('total',this)">Totale 2026</button>
+  <button class="stab" onclick="switchAgente('e2026',this)">E-2026</button>
+  <button class="stab" onclick="switchAgente('i2026',this)">I-2026</button>
+  <button class="stab" onclick="switchAgente('e2027',this)">E-2027 &#x1F4CA;</button>
+</div>
+
+<!-- ── CHARTS ROW (4 grafici) ── -->
+<div class="charts-row">
+  <div class="chart-card"><h3>Fatturato per Brand (tutte le stagioni)</h3><canvas id="brandChart"></canvas></div>
+  <div class="chart-card"><h3>Confronto Stagioni per Brand</h3><canvas id="stagChart"></canvas></div>
+  <div class="chart-card">
+    <h3>Fatturato per Agente &mdash; <span id="agente-lbl">Totale 2026</span></h3>
+    <canvas id="agenteChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>YoY &mdash; <span id="yoy-lbl">Estate: E-2025 vs E-2026</span></h3>
+    <div style="display:flex;gap:5px;margin-bottom:8px">
+      <button class="stab-sm active" onclick="switchYoY('estate',this)">Estate</button>
+      <button class="stab-sm" onclick="switchYoY('inverno',this)">Inverno</button>
+    </div>
+    <canvas id="yoyChart"></canvas>
+  </div>
+</div>
+
+<!-- ── TABELLA AGENTE / BRAND / STAGIONE ── -->
+<div class="table-section">
+  <h2>&#x1F4CA; Risultati per Agente, Brand e Stagione</h2>
+  <table class="agent-table">
+    <thead>
+      <tr>
+        <th>Agente</th><th>Brand</th><th>E-2026</th><th>I-2026</th><th>Totale 2026</th>
+        <th>E-2027 <span class="badge">in raccolta</span></th><th>I-2027 <span class="badge">in raccolta</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="ag-header"><td colspan="7">&#x1F535; FILIPPO</td></tr>
+      <tr class="brand-row"><td></td><td>Boboli &nbsp;<small style="color:#888">(100%)</small></td><td class="vp">&euro; 140.942</td><td class="vp">&euro; 170.877</td><td>&euro; 311.819</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>Tuc Tuc &nbsp;<small style="color:#888">(100%)</small></td><td class="vp">&euro; 74.186</td><td class="vp">&euro; 51.691</td><td>&euro; 125.877</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>Nath &nbsp;<small style="color:#888">(100%)</small></td><td class="vp">&euro; 31.479</td><td class="vp">&euro; 24.558</td><td>&euro; 56.037</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>Losan &nbsp;<small style="color:#888">(100%)</small></td><td class="vz">—</td><td class="vp">&euro; 8.245</td><td>&euro; 8.245</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>LSN &nbsp;<small style="color:#888">(100%)</small></td><td class="vz">—</td><td class="vp">&euro; 9.010</td><td>&euro; 9.010</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>Melby + MLB &nbsp;<small style="color:#888">(~54%)*</small></td><td class="vp">&euro; 167.988</td><td class="vp">&euro; 175.669</td><td>&euro; 343.657</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="tot-row"><td></td><td>TOTALE FILIPPO</td><td>&euro; 414.595</td><td>&euro; 440.050</td><td>&euro; 854.645</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="ag-header"><td colspan="7">&#x1F7E2; ROBERTO</td></tr>
+      <tr class="brand-row"><td></td><td>Melby + MLB &nbsp;<small style="color:#888">(~17%)*</small></td><td class="vp">&euro; 51.910</td><td class="vp">&euro; 59.455</td><td>&euro; 111.365</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="tot-row"><td></td><td>TOTALE ROBERTO</td><td>&euro; 51.910</td><td>&euro; 59.455</td><td>&euro; 111.365</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="ag-header"><td colspan="7">&#x1F7E0; ALESSANDRO</td></tr>
+      <tr class="brand-row"><td></td><td>Losan &nbsp;<small style="color:#888">(Filippo+Alex)</small></td><td class="vz">—</td><td class="vp">&euro; 2.777</td><td>&euro; 2.777</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>LSN &nbsp;<small style="color:#888">(Filippo+Alex)</small></td><td class="vz">—</td><td class="vp">&euro; 2.661</td><td>&euro; 2.661</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="brand-row"><td></td><td>Melby + MLB &nbsp;<small style="color:#888">(~29%)*</small></td><td class="vp">&euro; 91.787</td><td class="vp">&euro; 92.633</td><td>&euro; 184.420</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="tot-row"><td></td><td>TOTALE ALESSANDRO</td><td>&euro; 91.787</td><td>&euro; 98.071</td><td>&euro; 189.858</td><td class="e27cell">—</td><td class="vz">—</td></tr>
+      <tr class="grand-tot"><td>TOTALE</td><td>TUTTI I BRAND</td><td>&euro; 558.292</td><td>&euro; 597.576</td><td>&euro; 1.155.868</td><td>&euro; 0 <span class="badge">da aggiornare</span></td><td>&euro; 0</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:.71rem;color:#888;margin-top:8px">* Melby e MLB (F.lli Campagnolo) gestiti da tutti e tre gli agenti. Split basato su dati XLSX al 30/06/2026.</p>
+</div>
+
+<!-- ── YoY TABLE ── -->
+<div class="yoy-section">
+  <h2 style="font-size:.95rem;font-weight:700;color:#1A2B3C;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #1A2B3C;display:flex;align-items:center;gap:8px">&#x1F4C8; Confronto Anno su Anno — E-2025 vs E-2026 &bull; I-2025 vs I-2026</h2>
+  <table class="yoy-table">
+    <thead>
+      <tr>
+        <th style="text-align:left">Brand</th>
+        <th>E-2025</th><th>E-2026</th><th>&Delta; Estate</th>
+        <th>I-2025</th><th>I-2026</th><th>&Delta; Inverno</th>
+        <th>Tot. 2025</th><th>Tot. 2026</th><th>&Delta; Totale</th>
+      </tr>
+    </thead>
+    <tbody id="yoy-tbody"></tbody>
+  </table>
+  <p style="font-size:.71rem;color:#888;margin-top:6px">Fonte: ACCESS export ordini. Losan E-2026=0 perché non ancora confermato per la stagione estate. I valori I-2026 includono ordini fino al 30/06/2026.</p>
+</div>
+
+<!-- ── HEATMAP CLIENTI × BRAND ── -->
+<div class="heatmap-section">
+  <h2 style="font-size:.95rem;font-weight:700;color:#1A2B3C;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #E65100;display:flex;align-items:center;gap:8px">&#x1F525; Heatmap Clienti &times; Brand — Top 20 per Fatturato 2026</h2>
+  <table class="heatmap-table" id="heatmap-table">
+    <thead>
+      <tr>
+        <th style="text-align:left;min-width:180px">Cliente</th>
+        <th style="text-align:left">Agente</th>
+        <th>Melby</th><th>MLB</th><th>Boboli</th><th>Tuc Tuc</th><th>Nath</th><th>Losan</th><th>LSN</th>
+        <th>TOTALE</th>
+      </tr>
+    </thead>
+    <tbody id="heatmap-tbody"></tbody>
+  </table>
+  <p style="font-size:.71rem;color:#888;margin-top:6px">&#x2198; Opportunità cross-selling: celle vuote = brand non acquistati dal cliente. Colore intensità = volume €.</p>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────── */
+/* DATI CLIENTI */
+const MARKERS=[{"id":"ED4005","name":"A TESTA IN GIU'","citta":"S.MATTEO della DECIMA","pr":"BO","codice":"ED4005","zona":"Bologna","e2026":5858,"i2026":7205,"e2027":0,"totale":13063,"brands":["Melby","MLB","Tuc Tuc"],"lat":44.7122,"lng":11.2336},{"id":"ED1130","name":"ABBIGLIAMENTO OGGI E DOMANI","citta":"BARICELLA","pr":"BO","codice":"ED1130","zona":"Bologna","e2026":7558,"i2026":6423,"e2027":0,"totale":13981,"brands":["Melby","MLB"],"lat":44.6428,"lng":11.54},{"id":"ED8014","name":"AMBUSSE","citta":"CASTIGLIONE dei PEPOLI","pr":"BO","codice":"ED8014","zona":"Bologna","e2026":14242,"i2026":29246,"e2027":0,"totale":43488,"brands":["Melby","MLB","Boboli","Tuc Tuc"],"lat":44.1489,"lng":11.1488},{"id":"ED1461","name":"ARCOBALENO","citta":"LONGARA","pr":"BO","codice":"ED1461","zona":"Bologna","e2026":11652,"i2026":7695,"e2027":0,"totale":19347,"brands":["Melby","MLB","Boboli"],"lat":44.55,"lng":11.38},{"id":"ED8006","name":"ARLEY","citta":"COPPARO","pr":"FE","codice":"ED8006","zona":"Ferrara","e2026":9094,"i2026":2438,"e2027":0,"totale":11532,"brands":["Melby","MLB"],"lat":44.8941,"lng":11.8181},{"id":"ED3653","name":"BEBEROYAL","citta":"FERRARA","pr":"FE","codice":"ED3653","zona":"Ferrara","e2026":11267,"i2026":12320,"e2027":0,"totale":23587,"brands":["Melby","MLB"],"lat":44.8353,"lng":11.6195},{"id":"ED4021","name":"BELLI E MONELLI","citta":"CARPANETO","pr":"PC","codice":"ED4021","zona":"Piacenza","e2026":10204,"i2026":4333,"e2027":0,"totale":14537,"brands":["Melby","MLB","Boboli"],"lat":44.763,"lng":11.1},{"id":"ED3724","name":"BELLI E MONELLI","citta":"FONTANELLATO","pr":"PR","codice":"ED3724","zona":"Parma","e2026":0,"i2026":402,"e2027":0,"totale":402,"brands":["Melby"],"lat":44.882,"lng":10.154},{"id":"ED3715","name":"BONNIE & CLIDE","citta":"SERRAMAZZONI","pr":"MO","codice":"ED3715","zona":"Modena","e2026":3063,"i2026":1816,"e2027":0,"totale":4879,"brands":["Melby","MLB"],"lat":44.4292,"lng":10.7911},{"id":"ED2978","name":"CAMOMILLA","citta":"S.SOFIA","pr":"FC","codice":"ED2978","zona":"Forlì-Cesena","e2026":5305,"i2026":8797,"e2027":0,"totale":14102,"brands":["Melby","MLB","Boboli"],"lat":43.9499,"lng":11.9073},{"id":"ED3239","name":"CASA DEL FODERAME","citta":"BOLOGNA","pr":"BO","codice":"ED3239","zona":"Bologna","e2026":3086,"i2026":4926,"e2027":0,"totale":8012,"brands":["Melby","Boboli"],"lat":44.4949,"lng":11.3426},{"id":"ED3500","name":"CHICCO VIP","citta":"PIACENZA","pr":"PC","codice":"ED3500","zona":"Piacenza","e2026":5056,"i2026":5877,"e2027":0,"totale":10933,"brands":["Melby","MLB"],"lat":45.0526,"lng":9.693},{"id":"ED8012","name":"COLETTE","citta":"REGGIOLO","pr":"RE","codice":"ED8012","zona":"Reggio Emilia","e2026":15884,"i2026":20972,"e2027":0,"totale":36856,"brands":["Melby","Boboli"],"lat":44.9217,"lng":10.7918},{"id":"ED2322","name":"DODO' - LE PLEIADI","citta":"SOLIERA","pr":"MO","codice":"ED2322","zona":"Modena","e2026":7013,"i2026":6399,"e2027":0,"totale":13412,"brands":["Melby"],"lat":44.7377,"lng":10.9224},{"id":"ED2767","name":"F. ABBIGLIAMENTO srl","citta":"QUATTRO CASTELLA","pr":"RE","codice":"ED2767","zona":"Reggio Emilia","e2026":3852,"i2026":0,"e2027":0,"totale":3852,"brands":["Melby","MLB"],"lat":44.5892,"lng":10.4889},{"id":"ED3984","name":"FANTASIA","citta":"FORMIGINE","pr":"MO","codice":"ED3984","zona":"Modena","e2026":1869,"i2026":0,"e2027":0,"totale":1869,"brands":["Melby"],"lat":44.5742,"lng":10.8396},{"id":"ED2555","name":"FOLLE FOLLIA","citta":"CASTELNUOVO RANGONE","pr":"MO","codice":"ED2555","zona":"Modena","e2026":11133,"i2026":10479,"e2027":0,"totale":21612,"brands":["Melby","MLB"],"lat":44.5486,"lng":10.9365},{"id":"ED4026","name":"GIUSY CALZATURE","citta":"CREVALCORE","pr":"BO","codice":"ED4026","zona":"Bologna","e2026":5938,"i2026":5922,"e2027":0,"totale":11860,"brands":["Melby","MLB"],"lat":44.7256,"lng":11.1488},{"id":"ED3433","name":"GLI AMICI DI TEDDY (1)","citta":"BOLOGNA","pr":"BO","codice":"ED3433","zona":"Bologna","e2026":5825,"i2026":8124,"e2027":0,"totale":13949,"brands":["Melby","Boboli"],"lat":44.4949,"lng":11.3426},{"id":"ED3811","name":"HAPPY CHILDREN","citta":"CATTOLICA","pr":"RN","codice":"ED3811","zona":"Rimini","e2026":12783,"i2026":0,"e2027":0,"totale":12783,"brands":["Melby","MLB","Nath"],"lat":43.96,"lng":12.7373},{"id":"ED1783","name":"HAPPY KIDS OUTLET","citta":"RIMINI","pr":"RN","codice":"ED1783","zona":"Rimini","e2026":17725,"i2026":11866,"e2027":0,"totale":29591,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath"],"lat":44.0594,"lng":12.5683},{"id":"ED1193","name":"I 2 sas","citta":"RAVENNA","pr":"RA","codice":"ED1193","zona":"Ravenna","e2026":8081,"i2026":10352,"e2027":0,"totale":18433,"brands":["Melby","MLB"],"lat":44.4184,"lng":12.2035},{"id":"ED3429","name":"I MONELLI di BELLARIA","citta":"BELLARIA","pr":"RN","codice":"ED3429","zona":"Rimini","e2026":0,"i2026":5861,"e2027":0,"totale":5861,"brands":["Melby","Boboli"],"lat":44.1467,"lng":12.4768},{"id":"ED8010","name":"IB SELECTION","citta":"MONTESE","pr":"MO","codice":"ED8010","zona":"Modena","e2026":8074,"i2026":8154,"e2027":0,"totale":16228,"brands":["Melby","MLB"],"lat":44.262,"lng":10.9392},{"id":"ED3538","name":"IL BEBE' srls","citta":"CASTEL S.PIETRO TERME","pr":"BO","codice":"ED3538","zona":"Bologna","e2026":5987,"i2026":6323,"e2027":0,"totale":12310,"brands":["Melby","Boboli","Tuc Tuc"],"lat":44.3923,"lng":11.594},{"id":"ED1205","name":"IL MONDO DEI BIMBI","citta":"FORLIMPOPOLI","pr":"FC","codice":"ED1205","zona":"Forlì-Cesena","e2026":9680,"i2026":13486,"e2027":0,"totale":23166,"brands":["Melby","MLB","Boboli"],"lat":44.1833,"lng":12.1282},{"id":"ED4052","name":"IL MONDO DI MEMI","citta":"MASSA LOMBARDA","pr":"RA","codice":"ED4052","zona":"Ravenna","e2026":4532,"i2026":3196,"e2027":0,"totale":7728,"brands":["Melby","MLB"],"lat":44.4486,"lng":11.8228},{"id":"ED3508","name":"IL NEGOZIETTO DI ELI","citta":"BUSSETO","pr":"PR","codice":"ED3508","zona":"Parma","e2026":13335,"i2026":14915,"e2027":0,"totale":28250,"brands":["Melby","MLB","Boboli"],"lat":44.9809,"lng":10.0451},{"id":"ED3637","name":"INTIM8 snc","citta":"VIGNOLA","pr":"MO","codice":"ED3637","zona":"Modena","e2026":1094,"i2026":598,"e2027":0,"totale":1692,"brands":["Melby","MLB"],"lat":44.4767,"lng":10.9835},{"id":"ED2636","name":"INTIMO PIU'","citta":"OZZANO EMILIA","pr":"BO","codice":"ED2636","zona":"Bologna","e2026":4815,"i2026":4551,"e2027":0,"totale":9366,"brands":["Melby","MLB"],"lat":44.4611,"lng":11.4783},{"id":"ED3504","name":"KIDS BRANDS HOUSE","citta":"FERRARA","pr":"FE","codice":"ED3504","zona":"Ferrara","e2026":15048,"i2026":15385,"e2027":0,"totale":30433,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath"],"lat":44.8353,"lng":11.6195},{"id":"ED3640","name":"L'ANGOLO DI MATILDE","citta":"VILLA MINOZZO","pr":"RE","codice":"ED3640","zona":"Reggio Emilia","e2026":15780,"i2026":20183,"e2027":0,"totale":35963,"brands":["Melby","MLB","Boboli"],"lat":44.3631,"lng":10.4726},{"id":"ED3823","name":"L'IDEA CE L'HO","citta":"CARPI","pr":"MO","codice":"ED3823","zona":"Modena","e2026":17663,"i2026":15851,"e2027":0,"totale":33514,"brands":["Melby","MLB","Boboli"],"lat":44.7873,"lng":10.883},{"id":"ED4015","name":"L'ISOLA CHE NON C'E'","citta":"SAN LAZZARO DI SAVENA","pr":"BO","codice":"ED4015","zona":"Bologna","e2026":11654,"i2026":19194,"e2027":0,"totale":30848,"brands":["Melby","Boboli","Tuc Tuc"],"lat":44.47,"lng":11.4082},{"id":"ED3136","name":"L'OASI DEL BIANCO snc","citta":"VILLA VERRUCCHIO","pr":"RN","codice":"ED3136","zona":"Rimini","e2026":3768,"i2026":2639,"e2027":0,"totale":6407,"brands":["Melby","MLB"],"lat":43.9895,"lng":12.4503},{"id":"ED8000","name":"LA BOTTEGA DEI MONELLI","citta":"LIDO delle NAZIONI","pr":"FE","codice":"ED8000","zona":"Ferrara","e2026":21565,"i2026":16753,"e2027":0,"totale":38318,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath"],"lat":44.7382,"lng":12.233},{"id":"ED3948","name":"LATTE E BRICIOLE","citta":"CESENA","pr":"FC","codice":"ED3948","zona":"Forlì-Cesena","e2026":16388,"i2026":17380,"e2027":0,"totale":33768,"brands":["Melby","MLB","Boboli"],"lat":44.1391,"lng":12.2426},{"id":"ED4031","name":"LE LALLE snc","citta":"VISERBA","pr":"RN","codice":"ED4031","zona":"Rimini","e2026":24863,"i2026":9628,"e2027":0,"totale":34491,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath"],"lat":44.0883,"lng":12.5761},{"id":"ED8005","name":"LUGARESI CLAUDIA","citta":"SANTARCANGELO di ROMAGNA","pr":"RN","codice":"ED8005","zona":"Rimini","e2026":7743,"i2026":7689,"e2027":0,"totale":15432,"brands":["Melby","Boboli","Nath","Losan","LSN"],"lat":44.0619,"lng":12.4468},{"id":"ED2998","name":"MAGAZZINI EUROPA snc","citta":"CASALECCHIO di RENO","pr":"BO","codice":"ED2998","zona":"Bologna","e2026":2456,"i2026":3239,"e2027":0,"totale":5695,"brands":["Melby"],"lat":44.4788,"lng":11.2896},{"id":"ED3794","name":"MASTER","citta":"CATTOLICA","pr":"RN","codice":"ED3794","zona":"Rimini","e2026":4298,"i2026":10256,"e2027":0,"totale":14554,"brands":["Melby","MLB","Losan","LSN"],"lat":43.96,"lng":12.7373},{"id":"ED2889","name":"MASTRO CILIEGIA","citta":"PODENZANO","pr":"PC","codice":"ED2889","zona":"Piacenza","e2026":3725,"i2026":3292,"e2027":0,"totale":7017,"brands":["Melby"],"lat":44.9719,"lng":9.6959},{"id":"ED4028","name":"MERCERIA ALLE","citta":"LAMA MOCOGNO","pr":"MO","codice":"ED4028","zona":"Modena","e2026":3630,"i2026":3502,"e2027":0,"totale":7132,"brands":["Melby"],"lat":44.3151,"lng":10.7359},{"id":"ED3346","name":"MIRELLA INTIMO BABY","citta":"GAMBETTOLA","pr":"FC","codice":"ED3346","zona":"Forlì-Cesena","e2026":10543,"i2026":7469,"e2027":0,"totale":18012,"brands":["Melby","MLB","Boboli"],"lat":44.1171,"lng":12.3444},{"id":"ED4044","name":"NO3","citta":"BOBBIO","pr":"PC","codice":"ED4044","zona":"Piacenza","e2026":2171,"i2026":3463,"e2027":0,"totale":5634,"brands":["Melby","MLB"],"lat":44.7657,"lng":9.3867},{"id":"ED8011","name":"NOI DUE SAS","citta":"CORREGGIO","pr":"RE","codice":"ED8011","zona":"Reggio Emilia","e2026":19094,"i2026":13648,"e2027":0,"totale":32742,"brands":["Melby","MLB"],"lat":44.7728,"lng":10.781},{"id":"ED4062","name":"NUVOLA BIO","citta":"NOVAFELTRIA","pr":"RN","codice":"ED4062","zona":"Rimini","e2026":3684,"i2026":2885,"e2027":0,"totale":6569,"brands":["Melby"],"lat":43.8952,"lng":12.3007},{"id":"ED3077","name":"PANECIOCCOLATA","citta":"NOVAFELTRIA","pr":"RN","codice":"ED3077","zona":"Rimini","e2026":4481,"i2026":8252,"e2027":0,"totale":12733,"brands":["Melby","MLB"],"lat":43.8952,"lng":12.3007},{"id":"ED3268","name":"PATERLINI srl","citta":"CASTELNUOVO MONTI","pr":"RE","codice":"ED3268","zona":"Reggio Emilia","e2026":4040,"i2026":4507,"e2027":0,"totale":8547,"brands":["Melby","MLB"],"lat":44.4306,"lng":10.4092},{"id":"ED1220","name":"PINOCCHIO","citta":"REGGIO EMILIA","pr":"RE","codice":"ED1220","zona":"Reggio Emilia","e2026":3832,"i2026":5741,"e2027":0,"totale":9573,"brands":["Melby"],"lat":44.6987,"lng":10.6316},{"id":"ED4061","name":"POLLICINO","citta":"BELLARIVA di RIMINI","pr":"RN","codice":"ED4061","zona":"Rimini","e2026":5003,"i2026":6961,"e2027":0,"totale":11964,"brands":["Melby","Boboli","Tuc Tuc","Nath"],"lat":44.0283,"lng":12.5874},{"id":"ED2585","name":"PUNTO DONNA snc","citta":"PAVULLO","pr":"MO","codice":"ED2585","zona":"Modena","e2026":3475,"i2026":4597,"e2027":0,"totale":8072,"brands":["Melby","MLB"],"lat":44.3393,"lng":10.8341},{"id":"ED4042","name":"SALICOCO'","citta":"BOLOGNA","pr":"BO","codice":"ED4042","zona":"Bologna","e2026":8061,"i2026":13780,"e2027":0,"totale":21841,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath","Losan","LSN"],"lat":44.4949,"lng":11.3426},{"id":"ED3451","name":"SALSINI VALENTINA","citta":"S.PIETRO in CASALE","pr":"BO","codice":"ED3451","zona":"Bologna","e2026":739,"i2026":1269,"e2027":0,"totale":2008,"brands":["Melby"],"lat":44.7007,"lng":11.5576},{"id":"ED1432","name":"SANDRA MINI MODA sas","citta":"ALFONSINE","pr":"RA","codice":"ED1432","zona":"Ravenna","e2026":8231,"i2026":10241,"e2027":0,"totale":18472,"brands":["Melby","MLB"],"lat":44.508,"lng":12.038},{"id":"ED8017","name":"SARA SARTI","citta":"FANANO","pr":"MO","codice":"ED8017","zona":"Modena","e2026":0,"i2026":10558,"e2027":0,"totale":10558,"brands":["Melby","MLB"],"lat":44.2186,"lng":10.7944},{"id":"ED2332","name":"SETTEBELLO srl","citta":"CADEO","pr":"PC","codice":"ED2332","zona":"Piacenza","e2026":5086,"i2026":5381,"e2027":0,"totale":10467,"brands":["Melby","MLB"],"lat":44.9527,"lng":9.8449},{"id":"ED3223","name":"SORELLE ALBRIZZI snc","citta":"MONTEVEGLIO","pr":"BO","codice":"ED3223","zona":"Bologna","e2026":10024,"i2026":5073,"e2027":0,"totale":15097,"brands":["Melby","MLB"],"lat":44.4661,"lng":11.1105},{"id":"ED3857","name":"SPORT SERVICE","citta":"PONTE DELL'OLIO","pr":"PC","codice":"ED3857","zona":"Piacenza","e2026":4499,"i2026":4071,"e2027":0,"totale":8570,"brands":["Melby","MLB"],"lat":44.8617,"lng":9.654},{"id":"ED4023","name":"SQUARE","citta":"NOVELLARA","pr":"RE","codice":"ED4023","zona":"Reggio Emilia","e2026":1882,"i2026":2091,"e2027":0,"totale":3973,"brands":["Melby"],"lat":44.8453,"lng":10.727},{"id":"ED3457","name":"STELLA 14 snc","citta":"RIMINI","pr":"RN","codice":"ED3457","zona":"Rimini","e2026":6539,"i2026":8502,"e2027":0,"totale":15041,"brands":["Melby","MLB","Boboli","Tuc Tuc","Nath"],"lat":44.0594,"lng":12.5683},{"id":"ED2533","name":"CHILDREN","citta":"CASTELSANGIOVANNI","pr":"PC","codice":"ED2533","zona":"Piacenza","e2026":0,"i2026":1269,"e2027":0,"totale":1269,"brands":["MLB"],"lat":44.9711,"lng":9.4549},{"id":"ED3334","name":"GUENDALINA E ADELINA BLA' BLA'","citta":"SAN LAZZARO di SAVENA","pr":"BO","codice":"ED3334","zona":"Bologna","e2026":5482,"i2026":8397,"e2027":0,"totale":13879,"brands":["MLB","Nath","LSN"],"lat":44.47,"lng":11.4082},{"id":"ED8003","name":"HANSEL & GRETEL","citta":"CENTO","pr":"FE","codice":"ED8003","zona":"Ferrara","e2026":538,"i2026":0,"e2027":0,"totale":538,"brands":["MLB"],"lat":44.79,"lng":11.28},{"id":"ED8008","name":"MENEGANTI S.A.S.","citta":"PORRETTA TERME","pr":"BO","codice":"ED8008","zona":"Bologna","e2026":1225,"i2026":0,"e2027":0,"totale":1225,"brands":["MLB"],"lat":44.1556,"lng":10.9921},{"id":"ED4022","name":"BADABAM","citta":"NOVELLARA","pr":"RE","codice":"ED4022","zona":"Reggio Emilia","e2026":10230,"i2026":5894,"e2027":0,"totale":16124,"brands":["Boboli","Nath"],"lat":44.8453,"lng":10.727},{"id":"ED8009","name":"BALOO","citta":"MIRANDOLA","pr":"MO","codice":"ED8009","zona":"Modena","e2026":3475,"i2026":8986,"e2027":0,"totale":12461,"brands":["Boboli"],"lat":44.8866,"lng":11.0656},{"id":"ED1082","name":"BIMBI ELEGANTI","citta":"CESENATICO","pr":"FC","codice":"ED1082","zona":"Forlì-Cesena","e2026":3411,"i2026":1919,"e2027":0,"totale":5330,"brands":["Boboli"],"lat":44.2012,"lng":12.3949},{"id":"ED4053","name":"DONDOLANDO","citta":"MOLINELLA","pr":"BO","codice":"ED4053","zona":"Bologna","e2026":2044,"i2026":2400,"e2027":0,"totale":4444,"brands":["Boboli"],"lat":44.6227,"lng":11.6718},{"id":"ED8016","name":"LA CICOGNA","citta":"PAVULLO","pr":"MO","codice":"ED8016","zona":"Modena","e2026":0,"i2026":6733,"e2027":0,"totale":6733,"brands":["Boboli","Tuc Tuc"],"lat":44.3393,"lng":10.8341},{"id":"ED3050","name":"LE OCCASIONI DELL'IMPRONTA srl","citta":"CASTROCARO TERME","pr":"FC","codice":"ED3050","zona":"Forlì-Cesena","e2026":3896,"i2026":3933,"e2027":0,"totale":7829,"brands":["Boboli"],"lat":44.1778,"lng":11.9413},{"id":"ED8015","name":"MATHILU S.R.L.S.","citta":"PARMA","pr":"PR","codice":"ED8015","zona":"Parma","e2026":0,"i2026":18156,"e2027":0,"totale":18156,"brands":["Boboli","Tuc Tuc","Nath"],"lat":44.8015,"lng":10.3279},{"id":"ED8004","name":"OPPLA' snc","citta":"ANZOLA EMILIA","pr":"BO","codice":"ED8004","zona":"Bologna","e2026":3225,"i2026":2014,"e2027":0,"totale":5239,"brands":["Boboli"],"lat":44.5472,"lng":11.201},{"id":"ED1970","name":"SANITARIA ZUCCHI","citta":"SALSOMAGGIORE","pr":"PR","codice":"ED1970","zona":"Parma","e2026":5305,"i2026":4590,"e2027":0,"totale":9895,"brands":["Boboli"],"lat":44.8196,"lng":9.9843},{"id":"ED3982","name":"ALE & Co.","citta":"BOLOGNA","pr":"BO","codice":"ED3982","zona":"Bologna","e2026":7143,"i2026":5735,"e2027":0,"totale":12878,"brands":["Tuc Tuc","Nath"],"lat":44.4949,"lng":11.3426},{"id":"ED1650","name":"SANITARIA SALUTE AMICA","citta":"ALBINEA","pr":"RE","codice":"ED1650","zona":"Reggio Emilia","e2026":5368,"i2026":5509,"e2027":0,"totale":10877,"brands":["Tuc Tuc"],"lat":44.5985,"lng":10.5786},{"id":"ED1005","name":"ABBIGLIAMENTO VITTORINA","citta":"PUNTA MARINA","pr":"RA","codice":"ED1005","zona":"Ravenna","e2026":689,"i2026":0,"e2027":0,"totale":689,"brands":["Nath"],"lat":44.473,"lng":12.2706}];
+
+/* ── YoY BRAND DATA ── */
+const YOY_DATA=[
+  {brand:'Melby',       e25:234113, e26:272145, i25:292658, i26:262053},
+  {brand:'MLB',         e25:20171,  e26:39543,  i25:40421,  i26:64771},
+  {brand:'Boboli',      e25:147504, e26:140941, i25:159831, i26:168862},
+  {brand:'Tuc Tuc',     e25:47728,  e26:74185,  i25:47515,  i26:51691},
+  {brand:'Nath',        e25:12651,  e26:31477,  i25:13090,  i26:24559},
+  {brand:'Losan',       e25:74557,  e26:0,      i25:46688,  i26:11022},
+  {brand:'LSN',         e25:0,      e26:0,      i25:0,      i26:11671},
+  {brand:'Street Monkey',e25:0,     e26:0,      i25:0,      i26:0},
+];
+
+/* ── HEATMAP DATA ── */
+const HEATMAP_DATA=[
+  {name:"AMBUSSE",          ag:"Filippo",    v:[10051,3085,8082,22270,0,0,0],    tot:43488},
+  {name:"LA BOTTEGA DEI MONELLI",ag:"Filippo",v:[1704,70,7055,21238,8251,0,0], tot:38318},
+  {name:"COLETTE",          ag:"Filippo",    v:[10967,0,25889,0,0,0,0],          tot:36856},
+  {name:"L'ANGOLO DI MATILDE",ag:"Filippo", v:[16510,5382,14071,0,0,0,0],       tot:35963},
+  {name:"LE LALLE snc",     ag:"Filippo",    v:[7034,3522,11204,10170,2561,0,0], tot:34491},
+  {name:"LATTE E BRICIOLE", ag:"Filippo",    v:[16618,1775,15375,0,0,0,0],       tot:33768},
+  {name:"L'IDEA CE L'HO",   ag:"Filippo",    v:[10977,1733,20804,0,0,0,0],       tot:33514},
+  {name:"NOI DUE SAS",      ag:"Filippo",    v:[28571,4171,0,0,0,0,0],           tot:32742},
+  {name:"L'ISOLA CHE NON C'E'",ag:"Filippo",v:[12397,0,16091,2360,0,0,0],       tot:30848},
+  {name:"KIDS BRANDS HOUSE",ag:"Filippo",    v:[17788,716,9317,748,1864,0,0],    tot:30433},
+  {name:"HAPPY KIDS OUTLET",ag:"Filippo",    v:[16137,4720,5605,374,2755,0,0],   tot:29591},
+  {name:"IL NEGOZIETTO DI ELI",ag:"Filippo",v:[10790,110,17350,0,0,0,0],        tot:28250},
+  {name:"BEBEROYAL",        ag:"Filippo",    v:[20499,3088,0,0,0,0,0],           tot:23587},
+  {name:"IL MONDO DEI BIMBI",ag:"Filippo",  v:[9068,2881,11217,0,0,0,0],        tot:23166},
+  {name:"SALICOCO'",        ag:"Filippo",    v:[6013,1601,6675,3230,1545,1413,1364],tot:21841},
+  {name:"FOLLE FOLLIA",     ag:"Filippo",    v:[18339,3273,0,0,0,0,0],           tot:21612},
+  {name:"ARCOBALENO",       ag:"Filippo",    v:[12179,2193,4975,0,0,0,0],        tot:19347},
+  {name:"SANDRA MINI MODA", ag:"Roberto",   v:[18020,452,0,0,0,0,0],            tot:18472},
+  {name:"I 2 sas",          ag:"Roberto",    v:[9961,8472,0,0,0,0,0],            tot:18433},
+  {name:"MATHILU S.R.L.S.", ag:"Filippo",    v:[0,0,12357,5238,561,0,0],         tot:18156},
+];
+const BRAND_LABELS=["Melby","MLB","Boboli","Tuc Tuc","Nath","Losan","LSN"];
+const ZONA_LABELS=["Bologna","Ferrara","Forlì-Cesena","Modena","Parma","Piacenza","Ravenna","Reggio Emilia","Rimini"];
+const PAL=['#1565C0','#2E7D32','#E65100','#6A1B9A','#00838F','#AD1457','#558B2F','#EF6C00'];
+
+/* ── JITTER ── */
+function applyJitter(data){
+  const grp={};
+  data.forEach(m=>{const k=m.lat.toFixed(3)+','+m.lng.toFixed(3);if(!grp[k])grp[k]=[];grp[k].push(m.id);});
+  return data.map(m=>{
+    const k=m.lat.toFixed(3)+','+m.lng.toFixed(3);const g=grp[k];
+    if(g.length===1)return m;
+    const idx=g.indexOf(m.id);const angle=(2*Math.PI*idx/g.length)-Math.PI/2;const r=0.0042;
+    return{...m,lat:m.lat+r*Math.sin(angle),lng:m.lng+r*Math.cos(angle)};
+  });
+}
+
+/* ── MAPPA ── */
+let mapMarkers=[];
+const map=L.map('map').setView([44.5,11.0],8);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; CARTO',maxZoom:18}).addTo(map);
+function getColor(t){return t>30000?'#C62828':t>15000?'#E65100':t>8000?'#1565C0':t>3000?'#2E7D32':'#757575'}
+function getRadius(t){return t>30000?14:t>15000?11:t>8000?9:t>3000?7:5}
+
+function addMarkers(data){
+  mapMarkers.forEach(m=>map.removeLayer(m));mapMarkers=[];
+  const jit=applyJitter(data);
+  jit.forEach((m,i)=>{
+    const orig=data[i];
+    const c=L.circleMarker([m.lat,m.lng],{radius:getRadius(m.totale),fillColor:getColor(m.totale),color:'#fff',weight:1.5,fillOpacity:.87}).addTo(map);
+    const br=m.brands.join(', ');
+    const e=m.e2026.toLocaleString('it-IT',{maximumFractionDigits:0});
+    const iv=m.i2026.toLocaleString('it-IT',{maximumFractionDigits:0});
+    const tot=m.totale.toLocaleString('it-IT',{maximumFractionDigits:0});
+    c.bindPopup('<b>'+m.name+'</b><br><small style="color:#888">'+m.citta+' ('+m.pr+') — '+m.codice+'</small><br><br>📦 '+br+'<br><br>🌸 E-2026: <b>€'+e+'</b><br>❄️ I-2026: <b>€'+iv+'</b><br>💶 <b>Tot 2026: €'+tot+'</b><br><span style="color:#E65100;font-size:.8em">📊 E-2027: in raccolta</span>');
+    c.on('click',()=>map.setView([orig.lat,orig.lng],13));
+    mapMarkers.push(c);
+  });
+}
+addMarkers(MARKERS);
+
+const legend=L.control({position:'bottomright'});
+legend.onAdd=()=>{const d=L.DomUtil.create('div');d.style.cssText='background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.2);font-size:.78rem;line-height:1.9';d.innerHTML='<b>Fatturato 2026</b><br><span style="color:#C62828">● >30k</span><br><span style="color:#E65100">● 15-30k</span><br><span style="color:#1565C0">● 8-15k</span><br><span style="color:#2E7D32">● 3-8k</span><br><span style="color:#757575">● <3k</span>';return d;};
+legend.addTo(map);
+
+function renderClientList(data){
+  const s=[...data].sort((a,b)=>b.totale-a.totale);
+  document.getElementById('client-list').innerHTML=s.slice(0,50).map(m=>'<div class="client-row" onclick="map.setView(['+m.lat+','+m.lng+'],13)"><div><div class="client-name">'+m.name+'</div><div class="client-sub">'+m.citta+' — '+m.brands.join(', ')+'</div></div><div class="client-val">€'+Math.round(m.totale).toLocaleString('it-IT')+'</div></div>').join('');
+}
+renderClientList(MARKERS);
+
+function filterBrand(b,btn){
+  document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+  const f=b==='ALL'?MARKERS:MARKERS.filter(m=>m.brands.includes(b));
+  addMarkers(f);renderClientList(f);
+}
+function filterSearch(q){
+  const l=q.toLowerCase();
+  const f=MARKERS.filter(m=>m.name.toLowerCase().includes(l)||m.citta.toLowerCase().includes(l)||m.brands.some(b=>b.toLowerCase().includes(l)));
+  addMarkers(f);renderClientList(f);
+}
+
+/* ── CHART DATA ── */
+const BD={'E-2026':[257609, 39541, 135984, 61388, 31479, 0, 0],'I-2026':[258713, 63394, 164438, 43970, 13921, 8245, 9010],'E-2027':[0, 0, 0, 0, 0, 0, 0]};
+const AD={'total':[800815, 111365, 175512],'E-2026':[386494, 51910, 87597],'I-2026':[414321, 59455, 87915],'E-2027':[0, 0, 0]};
+const YOY_E={labels:BRAND_LABELS,v25:[234113,20171,147504,47728,12651,74557,0],v26:[272145,39543,140941,74185,31477,0,0]};
+const YOY_I={labels:BRAND_LABELS,v25:[292658,40421,159831,47515,13090,46688,0],v26:[262053,64771,168862,51691,24559,11022,11671]};
+
+function computeZona(key){
+  if(key==='e2027')return new Array(9).fill(0);
+  if(key==='total')return ZONA_LABELS.map(z=>MARKERS.filter(m=>m.zona===z).reduce((s,m)=>s+m.totale,0));
+  return ZONA_LABELS.map(z=>MARKERS.filter(m=>m.zona===z).reduce((s,m)=>s+(m[key]||0),0));
+}
+
+const fmt=v=>'€'+Math.round(v).toLocaleString('it-IT');
+
+/* ── CHART 1: Brand (grouped bar) ── */
+const brandChart=new Chart(document.getElementById('brandChart'),{
+  type:'bar',
+  data:{labels:BRAND_LABELS,datasets:[
+    {label:'E-2026',data:BD['E-2026'],backgroundColor:'#42A5F5',borderRadius:3},
+    {label:'I-2026',data:BD['I-2026'],backgroundColor:'#7E57C2',borderRadius:3},
+    {label:'E-2027',data:BD['E-2027'],backgroundColor:'rgba(230,81,0,.25)',borderRadius:3,borderWidth:2,borderColor:'#E65100'}
+  ]},
+  options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:10}}}},
+    scales:{y:{ticks:{callback:v=>'€'+v.toLocaleString('it-IT')},grid:{color:'#f0f0f0'}}}}
+});
+
+/* ── CHART 2: Stagioni (stacked) ── */
+const stagChart=new Chart(document.getElementById('stagChart'),{
+  type:'bar',
+  data:{labels:BRAND_LABELS,datasets:[
+    {label:'E-2026',data:BD['E-2026'],backgroundColor:'#42A5F5',borderRadius:2},
+    {label:'I-2026',data:BD['I-2026'],backgroundColor:'#7E57C2',borderRadius:2},
+    {label:'E-2027',data:BD['E-2027'],backgroundColor:'rgba(230,81,0,.3)',borderRadius:2,borderWidth:2,borderColor:'#E65100'}
+  ]},
+  options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:10}}}},
+    scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'€'+v.toLocaleString('it-IT')},grid:{color:'#f0f0f0'}}}}
+});
+
+/* ── CHART 3: Zona (doughnut) ── */
+let zonaChart=new Chart(document.getElementById('zonaChart'),{
+  type:'doughnut',
+  data:{labels:ZONA_LABELS,datasets:[{data:computeZona('total'),backgroundColor:PAL,hoverOffset:5}]},
+  options:{responsive:true,plugins:{legend:{position:'right',labels:{font:{size:9.5},boxWidth:11}}}}
+});
+function switchZona(key,btn){
+  document.querySelectorAll('.card .stab-sm').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const lbls={total:'Totale 2026',e2026:'E-2026',i2026:'I-2026',e2027:'E-2027 (in raccolta)'};
+  document.getElementById('zona-lbl').textContent=lbls[key];
+  zonaChart.data.datasets[0].data=computeZona(key);zonaChart.update();
+}
+
+/* ── CHART 4: Agente (pie) ── */
+let agenteChart=new Chart(document.getElementById('agenteChart'),{
+  type:'pie',
+  data:{labels:["Filippo","Roberto","Alessandro"],datasets:[{data:AD['total'],backgroundColor:['#1565C0','#2E7D32','#E65100'],hoverOffset:5}]},
+  options:{responsive:true,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:13}}}}
+});
+function switchAgente(key,btn){
+  document.querySelectorAll('.season-bar .stab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const lbls={total:'Totale 2026',e2026:'E-2026',i2026:'I-2026',e2027:'E-2027'};
+  document.getElementById('agente-lbl').textContent=lbls[key];
+  agenteChart.data.datasets[0].data=AD[key];agenteChart.update();
+}
+
+/* ── CHART 5: YoY (bar grouped) ── */
+let yoyChart=new Chart(document.getElementById('yoyChart'),{
+  type:'bar',
+  data:{labels:BRAND_LABELS,datasets:[
+    {label:'E-2025',data:YOY_E.v25,backgroundColor:'rgba(66,165,245,.5)',borderRadius:2},
+    {label:'E-2026',data:YOY_E.v26,backgroundColor:'#42A5F5',borderRadius:2}
+  ]},
+  options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:10}}}},
+    scales:{y:{ticks:{callback:v=>'€'+v.toLocaleString('it-IT')},grid:{color:'#f0f0f0'}}}}
+});
+function switchYoY(key,btn){
+  document.querySelectorAll('.chart-card .stab-sm').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  if(key==='estate'){
+    yoyChart.data.datasets=[
+      {label:'E-2025',data:YOY_E.v25,backgroundColor:'rgba(66,165,245,.5)',borderRadius:2},
+      {label:'E-2026',data:YOY_E.v26,backgroundColor:'#42A5F5',borderRadius:2}
+    ];
+    document.getElementById('yoy-lbl').textContent='Estate: E-2025 vs E-2026';
+  } else {
+    yoyChart.data.datasets=[
+      {label:'I-2025',data:YOY_I.v25,backgroundColor:'rgba(126,87,194,.5)',borderRadius:2},
+      {label:'I-2026',data:YOY_I.v26,backgroundColor:'#7E57C2',borderRadius:2}
+    ];
+    document.getElementById('yoy-lbl').textContent='Inverno: I-2025 vs I-2026';
+  }
+  yoyChart.update();
+}
+
+/* ── YoY TABLE ── */
+function pct(a,b){if(!a)return null;return((b-a)/a);}
+function fmtPct(v){if(v===null)return '<span class="neu">—</span>';const cls=v>=0?'pos':'neg';return '<span class="'+cls+'">'+(v>=0?'+':'')+(v*100).toFixed(1)+'%</span>';}
+const tb=document.getElementById('yoy-tbody');
+YOY_DATA.forEach(d=>{
+  const {brand,e25,e26,i25,i26}=d;
+  const t25=e25+i25,t26=e26+i26;
+  const row=document.createElement('tr');
+  row.innerHTML=`<td>${brand}</td>
+    <td>${e25?fmt(e25):'<span class="neu">—</span>'}</td>
+    <td>${e26?fmt(e26):'<span class="neu">—</span>'}</td>
+    <td>${fmtPct(pct(e25,e26))}</td>
+    <td>${i25?fmt(i25):'<span class="neu">—</span>'}</td>
+    <td>${i26?fmt(i26):'<span class="neu">—</span>'}</td>
+    <td>${fmtPct(pct(i25,i26))}</td>
+    <td>${t25?fmt(t25):'<span class="neu">—</span>'}</td>
+    <td>${t26?fmt(t26):'<span class="neu">—</span>'}</td>
+    <td>${fmtPct(pct(t25,t26))}</td>`;
+  tb.appendChild(row);
+});
+// Totale row
+const totalRow=document.createElement('tr');
+totalRow.className='grand';
+const T25e=536724,T26e=558292,T25i=600203,T26i=597576;
+totalRow.innerHTML=`<td>TOTALE</td>
+  <td>${fmt(T25e)}</td><td>${fmt(T26e)}</td><td>${fmtPct(pct(T25e,T26e))}</td>
+  <td>${fmt(T25i)}</td><td>${fmt(T26i)}</td><td>${fmtPct(pct(T25i,T26i))}</td>
+  <td>${fmt(T25e+T25i)}</td><td>${fmt(T26e+T26i)}</td><td>${fmtPct(pct(T25e+T25i,T26e+T26i))}</td>`;
+tb.appendChild(totalRow);
+
+/* ── HEATMAP ── */
+function heatColor(val,max){
+  if(!val) return '';
+  const intensity=Math.min(val/max,1);
+  const r=Math.round(21+(66-21)*(1-intensity));
+  const g=Math.round(43+(165-43)*(1-intensity));
+  const b=Math.round(60+(245-60)*(1-intensity));
+  return `background:rgba(${r},${g},${b},${0.15+intensity*0.75})`;
+}
+const agColors={'Filippo':'#1565C0','Roberto':'#2E7D32','Alessandro':'#E65100'};
+const hmMax=30000;
+const hmTb=document.getElementById('heatmap-tbody');
+HEATMAP_DATA.forEach(d=>{
+  const tr=document.createElement('tr');
+  const brandCells=d.v.map(v=>v?`<td style="${heatColor(v,hmMax)}">${fmt(v)}</td>`:`<td class="hm-zero">·</td>`).join('');
+  tr.innerHTML=`<td>${d.name}</td>
+    <td style="color:${agColors[d.ag]||'#333'};font-weight:600;font-size:.78rem">${d.ag}</td>
+    ${brandCells}
+    <td>${fmt(d.tot)}</td>`;
+  hmTb.appendChild(tr);
+});
+</script>
+</body>
+</html>
